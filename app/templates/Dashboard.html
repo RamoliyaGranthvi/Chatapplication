@@ -1,13 +1,15 @@
-<!-- Dashboard.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
     <h1>Welcome, {{ current_user_data.username }}!</h1>
+
+    <!-- Display users in a table -->
     <table border="1">
         <thead>
             <tr>
@@ -25,6 +27,7 @@
                         <td>{{ user[1] }}</td>
                         <td>{{ user[2] }}</td>
                         <td>
+                            <!-- Chat button to start chat with selected user -->
                             <form action="{{ url_for('chatpage', user_id=user[0]) }}" method="GET">
                                 <button type="submit">Chat Now</button>
                             </form>

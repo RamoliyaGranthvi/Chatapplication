@@ -2,51 +2,66 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Chat with {{ other_user[1] }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat with {{ other_user.username }}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-</head>
-<body>
-    <h1>Chat with {{ other_user[1] }}</h1>
-
-    <!-- Chat Box -->
-    <div id="chat-box">
-        {% if room in rooms %}
-            {% for message in rooms[room]["messages"] %}
-                <p><strong>{{ message.name }}:</strong> {{ message.message }}</p>
-            {% endfor %}
-        {% else %}
-            <p>No messages yet. Start chatting!</p>
-        {% endif %}
-    </div>
-
-    <!-- Message Input -->
-    <form id="message-form">
-        <input type="text" id="message" placeholder="Type your message..." required>
-        <button type="submit">Send</button>
-    </form>
-
-    <!-- Socket.io JS -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.min.js"></script>
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
     <script>
-        var socket = io.connect('http://' + document.domain + ':' + location.port);
+        // Initialize the socket connection to the server
+        var socket = io.connect();
 
-        // Join the chat room
-        socket.emit('join', {{ room | tojson }});
-
-        // Handle message sending
-        document.getElementById("message-form").addEventListener("submit", function(event) {
-            event.preventDefault();
-            var message = document.getElementById("message").value;
-            socket.emit('message', {message: message});
-            document.getElementById("message").value = '';  // Clear input field
+        // Join the room when the connection is established
+        socket.on('connect', function() {
+            socket.emit('join', { room: '{{ room }}' });
         });
 
-        // Display incoming messages
-        socket.on('message', function(data) {
-            var chatBox = document.getElementById("chat-box");
-            chatBox.innerHTML += "<p><strong>" + data.name + ":</strong> " + data.message + "</p>";
-            chatBox.scrollTop = chatBox.scrollHeight;  // Scroll to bottom
+        // Function to send a message
+        function sendMessage() {
+            var message = document.getElementById("message").value;
+            if (message.trim() !== '') {  // Prevent sending empty messages
+                socket.emit('message', { message: message });
+                document.getElementById("message").value = '';  // Clear the message input
+            }
+        }
+
+       socket.on('message', function(data) {
+    var messageList = document.getElementById("messages");
+    var messageElement = document.createElement("li");
+    messageElement.classList.add(data.name === '{{ current_user.username }}' ? 'message-sent' : 'message-received');
+    messageElement.innerText = data.name + ": " + data.message;
+    messageList.appendChild(messageElement);
+    messageList.scrollTop = messageList.scrollHeight;  // Scroll to the bottom
+});
+
+        // Optionally, handle system notifications
+        socket.on('system_message', function(data) {
+            var messageList = document.getElementById("messages");
+            var messageElement = document.createElement("li");
+            messageElement.classList.add('system-message');
+            messageElement.innerText = data.message;
+            messageList.appendChild(messageElement);
+            messageList.scrollTop = messageList.scrollHeight;
         });
     </script>
+</head>
+<body>
+
+    <div class="chat-container">
+        <h1>Chat with {{ other_user.username }}</h1>
+
+        <!-- Display previous messages -->
+        <ul id="messages">
+            {% for msg in room_messages %}
+                <li class="{{ 'message-sent' if msg.name == current_user.username else 'message-received' }}">
+                    {{ msg.name }}: {{ msg.message }}
+                </li>
+            {% endfor %}
+        </ul>
+
+        <!-- Input for sending messages -->
+        <textarea id="message" placeholder="Type your message"></textarea>
+        <button onclick="sendMessage()">Send</button>
+    </div>
+
 </body>
 </html>

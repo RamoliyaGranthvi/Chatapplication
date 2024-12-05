@@ -12,4 +12,4 @@ def add_routes(app):
     api.add_resource(Login, '/login')        # Login endpoint
     api.add_resource(Logout, '/logout')      # Logout endpoint
     api.add_resource ( Dashboard, '/dashboard' )  # Protected route
-    api.add_resource(Chatpage,'/chatpage/<int:user_id>')
+    api.add_resource(Chatpage, '/chatpage/<int:user_id>')
