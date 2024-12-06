@@ -1,11 +1,12 @@
-from flask import request , jsonify , make_response , render_template , flash , redirect , url_for , session , \
+from flask import request , make_response , render_template , flash , redirect , url_for , session , \
     current_app
 from flask_restful import Resource
 from werkzeug.security import generate_password_hash, check_password_hash
-from flask_login import login_user, logout_user, login_required, current_user, UserMixin
-from .extensions import db, login_manager, socketio
-from flask_socketio import emit, join_room, leave_room, send
+from flask_login import login_user, logout_user, login_required, current_user
+from app.current_app.extensions import db, login_manager, socketio
+from flask_socketio import join_room, leave_room, send
 from datetime import datetime
+from app.current_app import es_client
 rooms = {}
 
 
@@ -24,10 +25,6 @@ class User:
 
         def is_active(self):
             return True
-
-        def is_anonymous(self):
-            return False
-
         def get_id(self):
             return str(self.id)
 
@@ -48,11 +45,7 @@ class Home(Resource):
             return make_response(render_template('Login.html'))  # Login page for User 1
 
         # Check if the Elasticsearch connection is successful
-        def check_es_connection(self):
-            if es.ping ():
-                print ( "Elasticsearch connection is successful" )
-            else:
-                print ( "Failed to connect to Elasticsearch" )
+
     # Registration API
 class Register(Resource):
         def get(self):
@@ -149,8 +142,6 @@ class Chatpage ( Resource ):
                 flash ( 'You cannot chat with yourself.' , 'danger' )
                 return redirect ( url_for ( 'dashboard' ) )
 
-            # Get the current user id
-            current_user_id = current_user.id
 
             # Fetch the other user details by user_id from the database
             cur = db.connection.cursor ()
@@ -184,7 +175,7 @@ class Chatpage ( Resource ):
             )
 
         @staticmethod
-        def store_message_in_es(es , room_key , name , email ,   message_content):
+        def store_message_in_es(room_key , name , email ,   message_content):
             doc = {
                 'email': email ,
                 'name': name ,
@@ -192,12 +183,12 @@ class Chatpage ( Resource ):
                 'timestamp': datetime.utcnow () ,
             }
 
-            room_exists = es.exists ( index='chat_messages' , id=room_key )
+            room_exists = es_client.exists ( index='chat_messages' , id=room_key )
             print ( f"Checking if room exists: {room_exists}" )
 
             if room_exists:
                 try:
-                    es.update ( index='chat_messages' , id=room_key , body={
+                    es_client.update ( index='chat_messages' , id=room_key , body={
                         'script': {
                             'source': 'ctx._source.messages.add(params.message)' ,
                             'params': {'message': doc}
@@ -208,7 +199,7 @@ class Chatpage ( Resource ):
                     print ( f"Error appending message: {e}" )
             else:
                 try:
-                    es.index ( index='chat_messages' , id=room_key , document={
+                    es_client.index ( index='chat_messages' , id=room_key , document={
                         'room_key': room_key ,
                         'messages': [doc]
                     } )
@@ -216,12 +207,14 @@ class Chatpage ( Resource ):
                 except Exception as e:
                     print ( f"Error storing new room and message: {e}" )
 
+
         def get_chat_data_from_es(room_key ):
-                response = es.get ( index="chat_messages" , id=room_key )
+                response = es_client.get ( index="chat_messages" , id=room_key )
                 if response['found']:
                     return response['_source']['messages']
                 else:
                     return None  # No chat history found for this room
+
 
 
 @socketio.on ( 'message' )
@@ -261,15 +254,15 @@ def on_join(data):
 
 
 @socketio.on ( 'disconnect' )
-def disconnect(data):
-                room = session.get ( 'room' )
-                name = session.get ( 'name' )
+def disconnect():
+        room = session.get ( 'room' )
+        name = session.get ( 'name' )
 
-                if room:
-                    leave_room ( room )  # User leaves the room
-                    rooms[room]["members"] -= 1
-                    if rooms[room]["members"] == 0:
-                        del rooms[room]
-                    send ( {"name": "System" , "message": f"{name} Offline."} , to=room )
+        if room:
+                leave_room ( room )  # User leaves the room
+                rooms[room]["members"] -= 1
+        if rooms[room]["members"] == 0:
+            del rooms[room]
+            send ( {"name": "System" , "message": f"{name} Offline."} , to=room )
 
 

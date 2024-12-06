@@ -1,6 +1,6 @@
 # app/routes.py
 from flask_restful import Api
-from .resource import Home,Register, Login, Logout,Dashboard,Chatpage
+from app.current_app.resource import Home,Register, Login, Logout,Dashboard,Chatpage
 
 
 def add_routes(app):
